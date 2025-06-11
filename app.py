@@ -23,9 +23,11 @@ def create_multi_line_chart(df, title='Chart Name'):
     return fig
 
 chart_titles = {
-    'ss-rsrp': 'Signal Strength Levels',
-    'dl-thrp': 'Downlink Throughput',
-    'ul-thrp': 'Uplink Throughput',
+    'ss-rsrp': 'Signal Strength Levels [dBm]',
+    'dl-sinr': 'PDSCH C/(I+N) [dB]',
+    'dl-thrp': 'Downlink Throughput [kbps]',
+    'ul-sinr': 'PUSCH & PUCCH C/(I+N) [dB]',
+    'ul-thrp': 'Uplink Throughput [kbps]',
     # add more if needed
 }
 
