@@ -1,13 +1,13 @@
-#%%
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from dash import Dash, dcc, html, Input, Output
 
+app = Dash(__name__)
+server = app.server  # Needed by Render
+
 # Load your Excel file
 df = pd.read_excel("your_data.xlsx")
-
-app = Dash(__name__)
 
 # Line chart figure
 line_fig = go.Figure()
@@ -62,5 +62,3 @@ def update_map(hoverData):
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-# %%
