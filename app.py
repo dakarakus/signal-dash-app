@@ -1,9 +1,9 @@
-from dash import Dash
+from dash import Dash, html
 
 app = Dash(__name__)
-server = app.server
+server = app.server  # For Render
 
-app.layout = "Hello"
+app.layout = html.Div("Hello Dash is working!")
 
 if __name__ == "__main__":
     app.run_server(debug=True)
