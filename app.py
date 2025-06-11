@@ -28,7 +28,7 @@ chart_titles = {
     'dl-thrp': 'Downlink Throughput [kbps]',
     'ul-sinr': 'PUSCH & PUCCH C/(I+N) [dB]',
     'ul-thrp': 'Uplink Throughput [kbps]',
-    # add more if needed
+    # You can add more mappings if needed
 }
 
 app.layout = html.Div([
@@ -36,10 +36,7 @@ app.layout = html.Div([
     
     dcc.Upload(
         id='upload-data',
-        children=html.Div([
-            'Drag and Drop or ',
-            html.A('Select Excel File')
-        ]),
+        children=html.Div(['Drag and Drop or ', html.A('Select Excel File')]),
         style={
             'width': '50%',
             'height': '60px',
@@ -52,11 +49,9 @@ app.layout = html.Div([
         },
         multiple=False
     ),
-    
-    # Store parsed data here for sharing across callbacks
+
     dcc.Store(id='stored-data'),
-    
-    # Container for all charts/maps
+
     html.Div(id='output-charts')
 ])
 
@@ -84,11 +79,7 @@ def store_uploaded_file(contents, filename):
         dfs = parse_contents(contents, filename)
         if dfs is None:
             return {}
-        # Convert each df to JSON string (pandas serialization)
-        jsonified = {
-    sheet: dfs[sheet].to_json(date_format='iso', orient='split')
-    for sheet in dfs
-}
+        jsonified = {sheet: dfs[sheet].to_json(date_format='iso', orient='split') for sheet in dfs}
         return jsonified
     return {}
 
@@ -108,7 +99,7 @@ def update_output_charts(data):
             continue
         df = dfs[sheet]
         children.append(html.Div([
-            html.H2(sheet),
+            html.H2(chart_titles.get(sheet, sheet)),
             dcc.Graph(
                 id={'type': 'line-chart', 'sheet': sheet},
                 figure=create_multi_line_chart(df, title=chart_titles.get(sheet, sheet))
@@ -126,12 +117,14 @@ def update_output_charts(data):
 def update_maps(all_hover_data, stored_data):
     results = []
     if not stored_data:
-        # Return empty plots if no data
         return [go.Figure() for _ in all_hover_data]
     
     dfs = {sheet: pd.read_json(stored_data[sheet], orient='split') for sheet in stored_data}
-    
-    for sheet, hoverData in zip(dfs.keys(), all_hover_data):
+    sites_df = dfs.get('sites')
+
+    sheets = [s for s in dfs if s != 'sites']
+
+    for sheet, hoverData in zip(sheets, all_hover_data):
         df = dfs[sheet]
         point = None
         if hoverData is not None:
@@ -142,7 +135,8 @@ def update_maps(all_hover_data, stored_data):
                     point = filtered.iloc[0]
             except Exception:
                 pass
-        
+
+        # Base map with measurement points
         map_fig = px.scatter_mapbox(
             df,
             lat='Latitude',
@@ -151,22 +145,22 @@ def update_maps(all_hover_data, stored_data):
             zoom=10,
             height=400
         )
+        map_fig.update_traces(marker=dict(size=9, color='gray'))
+        map_fig.update_layout(mapbox_style="open-street-map")
 
-        # Add sites if available
-        sites_df = dfs.get('sites')
+        # Add site markers (blue with icon)
         if sites_df is not None:
             map_fig.add_trace(go.Scattermapbox(
                 lat=sites_df['Latitude'],
                 lon=sites_df['Longitude'],
                 mode='markers+text',
-                marker=dict(size=12, color='blue'),
+                marker=dict(size=12, color='blue', symbol='circle-dot'),
                 text=sites_df['Name'],
                 textposition='top right',
-                name='Site',
-                hoverinfo='text'
+                name='Sites'
             ))
-        map_fig.update_layout(mapbox_style="open-street-map")
-        
+
+        # Highlight hovered point
         if point is not None:
             map_fig.add_trace(go.Scattermapbox(
                 lat=[point['Latitude']],
@@ -175,7 +169,9 @@ def update_maps(all_hover_data, stored_data):
                 marker=dict(size=15, color='red'),
                 name='Selected Point'
             ))
+
         results.append(map_fig)
+
     return results
 
 if __name__ == '__main__':
