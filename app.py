@@ -4,11 +4,14 @@ import plotly.graph_objects as go
 import plotly.express as px
 from dash import Dash, dcc, html, Input, Output
 
+
 app = Dash(__name__)
 server = app.server  # Needed by Render
 
 # Load your Excel file
-df = pd.read_excel("your_data.xlsx")
+#df = pd.read_excel("your_data.xlsx")
+file_path = os.path.join(os.path.dirname(__file__), "your_data.xlsx")
+df = pd.read_excel(file_path)
 
 # Line chart figure
 line_fig = go.Figure()
