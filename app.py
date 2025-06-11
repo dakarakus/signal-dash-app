@@ -1,4 +1,5 @@
 import pandas as pd
+import os
 import plotly.graph_objects as go
 import plotly.express as px
 from dash import Dash, dcc, html, Input, Output
@@ -61,4 +62,5 @@ def update_map(hoverData):
         return map_fig
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 8050))
+    app.run_server(debug=False, host='0.0.0.0', port=port)
