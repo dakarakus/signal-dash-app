@@ -3,20 +3,46 @@ import io
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
-from dash import Dash, dcc, html, Input, Output, State
+from dash import Dash, dcc, html, Input, Output, State, ALL
 
 app = Dash(__name__)
 server = app.server
 
+fixed_cols = ['Point ID', 'Longitude', 'Latitude']
+
+def create_multi_line_chart(df, title='Chart Name'):
+    fig = go.Figure()
+    for col in df.columns:
+        if col not in fixed_cols:
+            fig.add_trace(go.Scatter(
+                x=df['Point ID'], y=df[col],
+                mode='lines+markers',
+                name=col
+            ))
+    fig.update_layout(title=title, hovermode='x unified')
+    return fig
+
+chart_titles = {
+    'ss-rsrp': 'Signal Strength Levels',
+    'dl-thrp': 'Downlink Throughput',
+    'ul-thrp': 'Uplink Throughput',
+    # add more if needed
+}
+
 app.layout = html.Div([
+    html.H1("Multi-Sheet Signal Dashboard with File Upload"),
+    
     dcc.Upload(
         id='upload-data',
-        children=html.Div(['Drag and Drop or ', html.A('Select Excel File')]),
+        children=html.Div([
+            'Drag and Drop or ',
+            html.A('Select Excel File')
+        ]),
         style={
-            'width': '300px',
+            'width': '50%',
             'height': '60px',
             'lineHeight': '60px',
-            'borderWidth': '1px',
+            'borderWidth': '2px',
             'borderStyle': 'dashed',
             'borderRadius': '5px',
             'textAlign': 'center',
@@ -24,68 +50,112 @@ app.layout = html.Div([
         },
         multiple=False
     ),
+    
+    # Store parsed data here for sharing across callbacks
     dcc.Store(id='stored-data'),
-    html.Div(id='charts-container')  # Here we will place all charts and maps
+    
+    # Container for all charts/maps
+    html.Div(id='output-charts')
 ])
 
-def parse_excel(contents):
+def parse_contents(contents, filename):
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
-    # Read excel file to pandas dataframe
-    df = pd.read_excel(io.BytesIO(decoded))
-    return df
+    try:
+        if filename.endswith('.xlsx') or filename.endswith('.xls'):
+            xls = pd.ExcelFile(io.BytesIO(decoded))
+            dfs = {sheet: xls.parse(sheet) for sheet in xls.sheet_names}
+            return dfs
+        else:
+            return None
+    except Exception as e:
+        print(e)
+        return None
 
 @app.callback(
     Output('stored-data', 'data'),
-    Input('upload-data', 'contents')
+    Input('upload-data', 'contents'),
+    State('upload-data', 'filename')
 )
-def store_uploaded_file(contents):
-    if contents is None:
-        return None
-    df = parse_excel(contents)
-    return df.to_json(date_format='iso', orient='split')
+def store_uploaded_file(contents, filename):
+    if contents is not None:
+        dfs = parse_contents(contents, filename)
+        if dfs is None:
+            return {}
+        # Convert each df to JSON string (pandas serialization)
+        jsonified = {sheet: dfs[sheet].to_json(date_format='iso', orient='split') for sheet in dfs}
+        return jsonified
+    return {}
 
 @app.callback(
-    Output('charts-container', 'children'),
+    Output('output-charts', 'children'),
     Input('stored-data', 'data')
 )
-def update_charts(jsonified_data):
-    if jsonified_data is None:
-        return html.Div("Please upload an Excel file to see the charts.")
+def update_output_charts(data):
+    if not data:
+        return html.Div("Upload an Excel file to see charts.")
     
-    df = pd.read_json(jsonified_data, orient='split')
+    dfs = {sheet: pd.read_json(data[sheet], orient='split') for sheet in data}
     
-    charts = []
-    # For example, assume your df has these columns for 5 charts
-    # You can loop and create charts dynamically here
-    for i in range(1, 6):
-        # Create line chart for Signal Level i
-        line_fig = go.Figure()
-        y_col = f'Signal Level {i}'
-        if y_col not in df.columns:
-            continue  # Skip if column doesn't exist
+    children = []
+    for sheet in dfs:
+        df = dfs[sheet]
+        children.append(html.Div([
+            html.H2(sheet),
+            dcc.Graph(
+                id={'type': 'line-chart', 'sheet': sheet},
+                figure=create_multi_line_chart(df, title=chart_titles.get(sheet, sheet))
+            ),
+            dcc.Graph(id={'type': 'map-chart', 'sheet': sheet})
+        ], style={'marginBottom': '50px'}))
+    return children
+
+@app.callback(
+    Output({'type': 'map-chart', 'sheet': ALL}, 'figure'),
+    Input({'type': 'line-chart', 'sheet': ALL}, 'hoverData'),
+    State('stored-data', 'data'),
+    prevent_initial_call=True
+)
+def update_maps(all_hover_data, stored_data):
+    results = []
+    if not stored_data:
+        # Return empty plots if no data
+        return [go.Figure() for _ in all_hover_data]
+    
+    dfs = {sheet: pd.read_json(stored_data[sheet], orient='split') for sheet in stored_data}
+    
+    for sheet, hoverData in zip(dfs.keys(), all_hover_data):
+        df = dfs[sheet]
+        point = None
+        if hoverData is not None:
+            try:
+                point_id = hoverData['points'][0]['x']
+                filtered = df[df['Point ID'] == point_id]
+                if not filtered.empty:
+                    point = filtered.iloc[0]
+            except Exception:
+                pass
         
-        line_fig.add_trace(go.Scatter(x=df['Point ID'], y=df[y_col], mode='lines+markers', name=y_col))
-        line_fig.update_layout(hovermode='x unified', title=f'Signal Levels Over Points - {y_col}')
-        
-        # Create map chart
         map_fig = px.scatter_mapbox(
             df,
             lat='Latitude',
             lon='Longitude',
             hover_name='Point ID',
             zoom=10,
-            height=300
+            height=400
         )
-        map_fig.update_layout(mapbox_style="open-street-map", margin={"r":0,"t":30,"l":0,"b":0})
+        map_fig.update_layout(mapbox_style="open-street-map")
         
-        # Append chart and map to container
-        charts.append(html.Div([
-            dcc.Graph(figure=line_fig),
-            dcc.Graph(figure=map_fig)
-        ], style={'marginBottom': '50px'}))
-    
-    return charts
+        if point is not None:
+            map_fig.add_trace(go.Scattermapbox(
+                lat=[point['Latitude']],
+                lon=[point['Longitude']],
+                mode='markers',
+                marker=dict(size=15, color='red'),
+                name='Selected Point'
+            ))
+        results.append(map_fig)
+    return results
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run(debug=True)
