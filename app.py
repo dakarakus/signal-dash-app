@@ -85,7 +85,10 @@ def store_uploaded_file(contents, filename):
         if dfs is None:
             return {}
         # Convert each df to JSON string (pandas serialization)
-        jsonified = {sheet: dfs[sheet].to_json(date_format='iso', orient='split') for sheet in dfs}
+        jsonified = {
+    sheet: dfs[sheet].to_json(date_format='iso', orient='split')
+    for sheet in dfs
+}
         return jsonified
     return {}
 
@@ -101,6 +104,8 @@ def update_output_charts(data):
     
     children = []
     for sheet in dfs:
+        if sheet == 'sites':
+            continue
         df = dfs[sheet]
         children.append(html.Div([
             html.H2(sheet),
@@ -146,6 +151,20 @@ def update_maps(all_hover_data, stored_data):
             zoom=10,
             height=400
         )
+
+        # Add sites if available
+        sites_df = dfs.get('sites')
+        if sites_df is not None:
+            map_fig.add_trace(go.Scattermapbox(
+                lat=sites_df['Latitude'],
+                lon=sites_df['Longitude'],
+                mode='markers+text',
+                marker=dict(size=12, color='blue'),
+                text=sites_df['Name'],
+                textposition='top right',
+                name='Site',
+                hoverinfo='text'
+            ))
         map_fig.update_layout(mapbox_style="open-street-map")
         
         if point is not None:
