@@ -1,9 +1,68 @@
-from dash import Dash, html
+import pandas as pd
+import os
+import plotly.graph_objects as go
+import plotly.express as px
+from dash import Dash, dcc, html, Input, Output
+
 
 app = Dash(__name__)
-server = app.server  # For Render
+server = app.server  # Needed by Render
 
-app.layout = html.Div("Hello Dash is working!")
+# Load your Excel file
+#df = pd.read_excel("your_data.xlsx")
+file_path = os.path.join(os.path.dirname(__file__), "your_data.xlsx")
+df = pd.read_excel(file_path)
 
-if __name__ == "__main__":
+# Line chart figure
+line_fig = go.Figure()
+line_fig.add_trace(go.Scatter(x=df['Point ID'], y=df['Signal Level 1'], mode='lines+markers', name='Signal Level 1'))
+line_fig.add_trace(go.Scatter(x=df['Point ID'], y=df['Signal Level 2'], mode='lines+markers', name='Signal Level 2'))
+line_fig.update_layout(hovermode='x unified', title='Signal Levels Over Points')
+
+# App layout
+app.layout = html.Div([
+    dcc.Graph(id='line-chart', figure=line_fig),
+    dcc.Graph(id='map-chart')
+])
+
+# Callback to update map when hovering on line chart
+@app.callback(
+    Output('map-chart', 'figure'),
+    Input('line-chart', 'hoverData')
+)
+def update_map(hoverData):
+    if hoverData:
+        point_id = hoverData['points'][0]['x']
+        point = df[df['Point ID'] == point_id].iloc[0]
+        map_fig = px.scatter_mapbox(
+            df,
+            lat='Latitude',
+            lon='Longitude',
+            hover_name='Point ID',
+            zoom=10,
+            height=500
+        )
+        map_fig.update_layout(mapbox_style="open-street-map")
+        # Highlight selected point
+        map_fig.add_trace(go.Scattermapbox(
+            lat=[point['Latitude']],
+            lon=[point['Longitude']],
+            mode='markers',
+            marker=dict(size=15, color='red'),
+            name='Selected Point'
+        ))
+        return map_fig
+    else:
+        map_fig = px.scatter_mapbox(
+            df,
+            lat='Latitude',
+            lon='Longitude',
+            hover_name='Point ID',
+            zoom=10,
+            height=500
+        )
+        map_fig.update_layout(mapbox_style="open-street-map")
+        return map_fig
+
+if __name__ == '__main__':
     app.run_server(debug=True)
