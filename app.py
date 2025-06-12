@@ -154,7 +154,7 @@ def update_maps(all_hover_data, stored_data):
                 lat=sites_df['Latitude'],
                 lon=sites_df['Longitude'],
                 mode='markers+text',
-                marker=dict(size=22, color='blue', symbol='triangle-up-dot'),
+                marker=dict(size=22, color='blue', symbol='circle-dot'),
                 text=sites_df['Name'],
                 textposition='top right',
                 name='Sites'
