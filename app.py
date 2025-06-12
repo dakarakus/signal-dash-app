@@ -154,10 +154,31 @@ def update_maps(all_hover_data, stored_data):
                 lat=sites_df['Latitude'],
                 lon=sites_df['Longitude'],
                 mode='markers+text',
-                marker=dict(size=22, color='blue', symbol='circle-dot'),
+                marker=dict(size=18, color='blue', symbol='circle'),
                 text=sites_df['Name'],
-                textposition='top right',
-                name='Sites'
+                textposition='top center',
+                textfont=dict(
+                    size=14,
+                    color='black'
+                ),
+                name='Sites',
+                hoverinfo='text'
+            ))
+
+            # Add "buffer" behind text using a second invisible marker for contrast
+            map_fig.add_trace(go.Scattermapbox(
+                lat=sites_df['Latitude'],
+                lon=sites_df['Longitude'],
+                mode='text',
+                text=sites_df['Name'],
+                textposition='top center',
+                textfont=dict(
+                    size=16,
+                    color='white'
+                ),
+                name='',
+                showlegend=False,
+                hoverinfo='skip'
             ))
 
         # Highlight hovered point
